@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Player Design - Zaid Syed</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<div class="container">
+    <div class="music-player" style="position: relative; overflow: hidden;">
+        <nav>
+            <div class="circle" onclick="prevSong()" style="cursor: pointer;">
+                <i class="fa-solid fa-angle-left"></i>
+            </div>
+            <div class="circle" onclick="togglePlaylist()" title="Open Playlist / Folder" style="cursor: pointer;">
+                <i class="fa-solid fa-bars"></i>
+            </div>
+        </nav>
+
+        <div id="playlistPanel" style="display: none; position: absolute; inset: 0; background: #ffe0e5; z-index: 10; padding: 25px; flex-direction: column; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h2 style="font-size: 18px; color: #333;">Playlist</h2>
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="document.getElementById('folderPicker').click()" style="background: #f53192; color: #fff; border: none; padding: 6px 12px; border-radius: 20px; font-size: 12px; cursor: pointer;">Select Folder</button>
+                    <button onclick="togglePlaylist()" style="background: #fff; color: #f53192; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+            <p id="trackCount" style="font-size: 12px; color: #666; margin-bottom: 10px;">1 song loaded</p>
+            <ul id="trackList" style="list-style: none; overflow-y: auto; flex: 1; padding-right: 4px;"></ul>
+        </div>
+
+        <input type="file" id="folderPicker" webkitdirectory multiple accept="audio/*" hidden>
+        <img src="media/thumbnail.png" onerror="this.onerror=null; this.src='thumbnail.png';" class="song-img">
+        <h1 id="songTitle">Go</h1>
+        <p id="songArtist">NEFFEX</p>
+
+        <audio id="song"></audio>
+        <input type="range" value="0" id="progress">
+
+        <div class="controls">
+            <div onclick="prevSong()"><i class="fa-solid fa-backward"></i></div>
+            <div onclick="playPause()"><i class="fa-solid fa-play" id="ctrlIcon"></i></div>
+            <div onclick="nextSong()"><i class="fa-solid fa-forward"></i></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let progress = document.getElementById("progress");
+let song = document.getElementById("song");
+let ctrlIcon = document.getElementById("ctrlIcon");
+let songTitle = document.getElementById("songTitle");
+let songArtist = document.getElementById("songArtist");
+let folderPicker = document.getElementById("folderPicker");
+let playlistPanel = document.getElementById("playlistPanel");
+let trackList = document.getElementById("trackList");
+let trackCount = document.getElementById("trackCount");
+
+function parseTrackInfo(filePath) {
+    const fileName = filePath.split('/').pop().split('\\').pop().replace(/\.[^/.]+$/, "");
+    const parts = fileName.split('-');
+    if (parts.length >= 2) {
+        return {
+            title: parts[0].trim(),
+            artist: parts.slice(1).join('-').trim()
+        };
+    }
+    return {
+        title: fileName.trim(),
+        artist: "Unknown Artist"
+    };
+}
+
+let songs = [
+    {
+        src: "media/Go-NEFFEX.mp3",
+        fallbackSrc: "Go-NEFFEX.mp3",
+        ...parseTrackInfo("Go-NEFFEX.mp3")
+    }
+];
+
+let currentIndex = 0;
+
+function renderPlaylist() {
+    trackCount.textContent = `${songs.length} ${songs.length === 1 ? "song" : "songs"} loaded`;
+    trackList.innerHTML = "";
+    songs.forEach((track, index) => {
+        const li = document.createElement("li");
+        const isActive = index === currentIndex;
+        li.style.cssText = `padding: 10px 12px; margin-bottom: 8px; border-radius: 10px; cursor: pointer; background: ${isActive ? "#f53192" : "#fff"}; color: ${isActive ? "#fff" : "#333"}; box-shadow: 0 3px 8px rgba(255, 26, 26, 0.12);`;
+        li.innerHTML = `<div style="font-size: 14px; font-weight: 500;">${track.title}</div><div style="font-size: 11px; opacity: 0.8;">${track.artist}</div>`;
+        li.onclick = () => {
+            currentIndex = index;
+            loadSong(currentIndex, true);
+            togglePlaylist();
+        };
+        trackList.appendChild(li);
+    });
+}
+
+function togglePlaylist() {
+    playlistPanel.style.display = playlistPanel.style.display === "none" ? "flex" : "none";
+}
+
+function loadSong(index, autoPlay = false) {
+    const track = songs[index];
+    let triedFallback = false;
+
+    song.onerror = function() {
+        if (track.fallbackSrc && !triedFallback) {
+            triedFallback = true;
+            song.src = track.fallbackSrc;
+            if (autoPlay) song.play();
+        }
+    };
+
+    song.src = track.src;
+    songTitle.textContent = track.title;
+    songArtist.textContent = track.artist;
+    progress.value = 0;
+    renderPlaylist();
+
+    if (autoPlay) {
+        song.play();
+        ctrlIcon.classList.add("fa-pause");
+        ctrlIcon.classList.remove("fa-play");
+    } else {
+        ctrlIcon.classList.remove("fa-pause");
+        ctrlIcon.classList.add("fa-play");
+    }
+}
+
+song.onloadedmetadata = function() {
+    progress.max = song.duration;
+    progress.value = song.currentTime;
+};
+
+song.ontimeupdate = function() {
+    progress.value = song.currentTime;
+};
+
+song.onended = function() {
+    nextSong();
+};
+
+function playPause() {
+    if (ctrlIcon.classList.contains("fa-pause")) {
+        song.pause();
+        ctrlIcon.classList.remove("fa-pause");
+        ctrlIcon.classList.add("fa-play");
+    } else {
+        song.play();
+        ctrlIcon.classList.add("fa-pause");
+        ctrlIcon.classList.remove("fa-play");
+    }
+}
+
+function nextSong() {
+    currentIndex = (currentIndex + 1) % songs.length;
+    loadSong(currentIndex, true);
+}
+
+function prevSong() {
+    currentIndex = (currentIndex - 1 + songs.length) % songs.length;
+    loadSong(currentIndex, true);
+}
+
+progress.onchange = function() {
+    song.play();
+    song.currentTime = progress.value;
+    ctrlIcon.classList.add("fa-pause");
+    ctrlIcon.classList.remove("fa-play");
+};
+
+folderPicker.addEventListener("change", function(e) {
+    const audioFiles = Array.from(e.target.files).filter(file =>
+        file.type.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(file.name)
+    );
+    if (audioFiles.length > 0) {
+        songs = audioFiles.map(file => ({
+            src: URL.createObjectURL(file),
+            ...parseTrackInfo(file.name)
+        }));
+        currentIndex = 0;
+        loadSong(currentIndex, true);
+    }
+});
+
+loadSong(currentIndex, false);
+</script>
+
+</body>
+</html>
